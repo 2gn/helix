@@ -72,8 +72,8 @@ impl Default for History {
             revisions: vec![Revision {
                 parent: 0,
                 last_child: None,
-                transaction: Transaction::from(ChangeSet::new(&Rope::new())),
-                inversion: Transaction::from(ChangeSet::new(&Rope::new())),
+                transaction: Transaction::from(ChangeSet::new("".into())),
+                inversion: Transaction::from(ChangeSet::new("".into())),
                 timestamp: Instant::now(),
             }],
             current: 0,
@@ -131,7 +131,7 @@ impl History {
             .map(|&n| self.revisions[n].inversion.clone());
         let down_txns = down.iter().map(|&n| self.revisions[n].transaction.clone());
 
-        up_txns.chain(down_txns).reduce(|acc, tx| tx.compose(acc))
+        down_txns.chain(up_txns).reduce(|acc, tx| tx.compose(acc))
     }
 
     /// Undo the last edit.
