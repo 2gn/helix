@@ -16,8 +16,31 @@
  (#match? @variable.builtin "^(arguments|module|console|window|document)$")
  (#is-not? local))
 
-((identifier) @function.builtin
- (#eq? @function.builtin "require")
+(call_expression
+ (identifier) @function.builtin
+ (#any-of? @function.builtin
+  "eval"
+  "fetch"
+  "isFinite"
+  "isNaN"
+  "parseFloat"
+  "parseInt"
+  "decodeURI"
+  "decodeURIComponent"
+  "encodeURI"
+  "encodeURIComponent"
+  "require"
+  "alert"
+  "prompt"
+  "btoa"
+  "atob"
+  "confirm"
+  "structuredClone"
+  "setTimeout"
+  "clearTimeout"
+  "setInterval"
+  "clearInterval"
+  "queueMicrotask")
  (#is-not? local))
 
 ; Function and method definitions
@@ -29,14 +52,23 @@
   name: (identifier) @function)
 (method_definition
   name: (property_identifier) @function.method)
+(method_definition
+  name: (private_property_identifier) @function.method.private)
 
 (pair
   key: (property_identifier) @function.method
+  value: [(function) (arrow_function)])
+(pair
+  key: (private_property_identifier) @function.method.private
   value: [(function) (arrow_function)])
 
 (assignment_expression
   left: (member_expression
     property: (property_identifier) @function.method)
+  right: [(function) (arrow_function)])
+(assignment_expression
+  left: (member_expression
+    property: (private_property_identifier) @function.method.private)
   right: [(function) (arrow_function)])
 
 (variable_declarator
@@ -46,8 +78,15 @@
 (assignment_expression
   left: (identifier) @function
   right: [(function) (arrow_function)])
-  
 
+; Function and method parameters
+;-------------------------------
+
+; Arrow function parameters in the form `p => ...` are supported by both
+; javascript and typescript grammars without conflicts.
+(arrow_function
+  parameter: (identifier) @variable.parameter)
+  
 ; Function and method calls
 ;--------------------------
 
@@ -57,6 +96,9 @@
 (call_expression
   function: (member_expression
     property: (property_identifier) @function.method))
+(call_expression
+  function: (member_expression
+    property: (private_property_identifier) @function.method.private))
 
 ; Variables
 ;----------
@@ -67,6 +109,7 @@
 ;-----------
 
 (property_identifier) @variable.other.member
+(private_property_identifier) @variable.other.member.private
 (shorthand_property_identifier) @variable.other.member
 (shorthand_property_identifier_pattern) @variable.other.member
 
@@ -102,7 +145,7 @@
 
 [
   ";"
-  "?."
+  (optional_chain) ; ?.
   "."
   ","
 ] @punctuation.delimiter
@@ -167,55 +210,76 @@
 ]  @punctuation.bracket
 
 [
-  "as"
   "async"
   "debugger"
   "delete"
   "extends"
   "from"
-  "function"
   "get"
-  "in"
-  "instanceof"
   "new"
-  "of"
   "set"
-  "static"
   "target"
-  "try"
   "typeof"
+  "instanceof"
   "void"
   "with"
 ] @keyword
 
 [
+  "of"
+  "as"
+  "in"
+] @keyword.operator
+
+[
+  "function"
+] @keyword.function
+
+[
   "class"
   "let"
-  "const"
   "var"
 ] @keyword.storage.type
 
 [
-  "switch"
-  "case"
+  "const"
+  "static"
+] @keyword.storage.modifier
+
+[
   "default"
-  "if"
-  "else"
   "yield"
-  "throw"
   "finally"
-  "return"
-  "catch"
-  "continue"
-  "while"
-  "break"
-  "for"
   "do"
   "await"
 ] @keyword.control
 
 [
+  "if"
+  "else"
+  "switch"
+  "case"
+  "while"
+] @keyword.control.conditional
+
+[
+  "for"
+] @keyword.control.repeat
+
+[
   "import"
   "export"
 ] @keyword.control.import 
+
+[
+  "return"
+  "break"
+  "continue"
+] @keyword.control.return
+
+[
+  "throw"
+  "try"
+  "catch"
+] @keyword.control.exception
 

@@ -5,11 +5,16 @@
 ; overrides are unnecessary.
 ; -------
 
-
-
 ; -------
 ; Types
 ; -------
+
+(type_parameters
+  (type_identifier) @type.parameter)
+(constrained_type_parameter
+  left: (type_identifier) @type.parameter)
+(optional_type_parameter
+  name: (type_identifier) @type.parameter)
 
 ; ---
 ; Primitives
@@ -25,6 +30,8 @@
   (string_literal)
   (raw_string_literal)
 ] @string
+(outer_doc_comment_marker "/" @comment)
+(inner_doc_comment_marker "!" @comment)
 [
   (line_comment)
   (block_comment)
@@ -46,8 +53,66 @@
 (lifetime
   "'" @label
   (identifier) @label)
-(loop_label
-  (identifier) @type)
+(label
+  "'" @label
+  (identifier) @label)
+
+; ---
+; Prelude
+; ---
+
+((identifier) @type.enum.variant.builtin
+ (#any-of? @type.enum.variant.builtin "Some" "None" "Ok" "Err"))
+
+
+(call_expression
+  (identifier) @function.builtin
+  (#any-of? @function.builtin
+    "drop"
+    "size_of"
+    "size_of_val"
+    "align_of"
+    "align_of_val"))
+
+((type_identifier) @type.builtin
+ (#any-of?
+    @type.builtin
+    "Send"
+    "Sized"
+    "Sync"
+    "Unpin"
+    "Drop"
+    "Fn"
+    "FnMut"
+    "FnOnce"
+    "AsMut"
+    "AsRef"
+    "From"
+    "Into"
+    "DoubleEndedIterator"
+    "ExactSizeIterator"
+    "Extend"
+    "IntoIterator"
+    "Iterator"
+    "Option"
+    "Result"
+    "Clone"
+    "Copy"
+    "Debug"
+    "Default"
+    "Eq"
+    "Hash"
+    "Ord"
+    "PartialEq"
+    "PartialOrd"
+    "ToOwned"
+    "Box"
+    "String"
+    "ToString"
+    "Vec"
+    "FromIterator"
+    "TryFrom"
+    "TryInto"))
 
 ; ---
 ; Punctuation
@@ -58,6 +123,7 @@
   "."
   ";"
   ","
+  ":"
 ] @punctuation.delimiter
 
 [
@@ -104,16 +170,13 @@
 (closure_parameters
 	(identifier) @variable.parameter)
 
-
-
 ; -------
 ; Keywords
 ; -------
 
 (for_expression
   "for" @keyword.control.repeat)
-((identifier) @keyword.control
-  (#match? @keyword.control "^yield$"))
+(gen_block "gen" @keyword.control)
 
 "in" @keyword.control
 
@@ -121,6 +184,7 @@
   "match"
   "if"
   "else"
+  "try"
 ] @keyword.control.conditional
 
 [
@@ -131,10 +195,9 @@
 [
   "break"
   "continue"
-
   "return"
-
   "await"
+  "yield"
 ] @keyword.control.return
 
 "use" @keyword.control.import
@@ -142,6 +205,10 @@
 (use_as_clause "as" @keyword.control.import)
 
 (type_cast_expression "as" @keyword.operator)
+
+((generic_type
+    type: (type_identifier) @keyword)
+ (#eq? @keyword "use"))
 
 [
   (crate)
@@ -156,10 +223,7 @@
   "trait"
   "for"
 
-  "unsafe"
   "default"
-  "macro_rules!"
-
   "async"
 ] @keyword
 
@@ -167,13 +231,13 @@
   "struct"
   "enum"
   "union"
-
   "type"
 ] @keyword.storage.type
 
 "let" @keyword.storage
-
 "fn" @keyword.function
+"unsafe" @keyword.special
+"macro_rules!" @function.macro
 
 (mutable_specifier) @keyword.storage.modifier.mut
 
@@ -183,12 +247,40 @@
 [
   "static"
   "const"
+  "raw"
   "ref"
   "move"
   "dyn"
 ] @keyword.storage.modifier
 
 ; TODO: variable.mut to highlight mutable identifiers via locals.scm
+
+; -------
+; Constructors
+; -------
+; TODO: this is largely guesswork, remove it once we get actual info from locals.scm or r-a
+
+(struct_expression
+  name: (type_identifier) @constructor)
+
+(tuple_struct_pattern
+  type: [
+    (identifier) @constructor
+    (scoped_identifier
+      name: (identifier) @constructor)
+  ])
+(struct_pattern
+  type: [
+    ((type_identifier) @constructor)
+    (scoped_type_identifier
+      name: (type_identifier) @constructor)
+  ])
+(match_pattern
+  ((identifier) @constructor) (#match? @constructor "^[A-Z]"))
+(or_pattern
+  ((identifier) @constructor)
+  ((identifier) @constructor)
+  (#match? @constructor "^[A-Z]"))
 
 ; -------
 ; Guess Other Types
@@ -204,33 +296,28 @@
 
 (call_expression
   function: [
-    ((identifier) @type.variant
-      (#match? @type.variant "^[A-Z]"))
+    ((identifier) @constructor
+      (#match? @constructor "^[A-Z]"))
     (scoped_identifier
-      name: ((identifier) @type.variant
-        (#match? @type.variant "^[A-Z]")))
+      name: ((identifier) @constructor
+        (#match? @constructor "^[A-Z]")))
   ])
 
 ; ---
-; Assume that types in match arms are enums and not
-; tuple structs. Same for `if let` expressions.
+; PascalCase identifiers under a path which is also PascalCase
+; are assumed to be constructors if they have methods or fields.
 ; ---
 
-(match_pattern
-    (scoped_identifier
-      name: (identifier) @constructor))
-(tuple_struct_pattern
-    type: [
-      ((identifier) @constructor)
-      (scoped_identifier  
-        name: (identifier) @constructor)
-      ])
-(struct_pattern
-  type: [
-    ((type_identifier) @constructor)
-    (scoped_type_identifier
-      name: (type_identifier) @constructor)
-    ])
+(field_expression
+  value: (scoped_identifier
+    path: [
+      (identifier) @type
+      (scoped_identifier
+        name: (identifier) @type)
+    ]
+    name: (identifier) @constructor
+      (#match? @type "^[A-Z]")
+      (#match? @constructor "^[A-Z]")))
 
 ; ---
 ; Other PascalCase identifiers are assumed to be structs.
@@ -239,7 +326,7 @@
 ((identifier) @type
   (#match? @type "^[A-Z]"))
 
-
+(never_type "!" @type)
 
 ; -------
 ; Functions
@@ -271,6 +358,13 @@
 ; ---
 ; Macros
 ; ---
+
+(attribute
+  (identifier) @special
+  arguments: (token_tree (identifier) @type)
+  (#eq? @special "derive")
+)
+
 (attribute
   (identifier) @function.macro)
 (attribute
@@ -295,8 +389,6 @@
 
 (metavariable) @variable.parameter
 (fragment_specifier) @type
-
-
 
 ; -------
 ; Operators
@@ -343,8 +435,6 @@
   "'"
 ] @operator
 
-
-
 ; -------
 ; Paths
 ; -------
@@ -354,7 +444,8 @@
 (use_wildcard
   (identifier) @namespace)
 (extern_crate_declaration
-  name: (identifier) @namespace)
+  name: (identifier) @namespace
+  alias: (identifier)? @namespace)
 (mod_item
   name: (identifier) @namespace)
 (scoped_use_list
@@ -375,12 +466,11 @@
 (scoped_type_identifier
   path: (identifier) @namespace)
 
-
-
 ; -------
 ; Remaining Identifiers
 ; -------
 
+; We do not style ? as an operator on purpose as it allows styling ? differently, as many highlighters do. @operator.special might have been a better scope, but @special is already documented so the change would break themes (including the intent of the default theme)
 "?" @special
 
 (type_identifier) @type

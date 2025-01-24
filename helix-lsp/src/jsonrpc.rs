@@ -104,8 +104,45 @@ impl std::error::Error for Error {}
 #[serde(untagged)]
 pub enum Id {
     Null,
-    Num(u64),
+    Num(#[serde(deserialize_with = "deserialize_jsonrpc_id_num")] u64),
     Str(String),
+}
+
+fn deserialize_jsonrpc_id_num<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let num = serde_json::Number::deserialize(deserializer)?;
+
+    if let Some(val) = num.as_u64() {
+        return Ok(val);
+    };
+
+    // Accept floats as long as they represent positive whole numbers.
+    // The JSONRPC spec says "Numbers SHOULD NOT contain fractional parts" so we should try to
+    // accept them if possible. The JavaScript type system lumps integers and floats together so
+    // some languages may serialize integer IDs as floats with a zeroed fractional part.
+    // See <https://github.com/helix-editor/helix/issues/12367>.
+    if let Some(val) = num
+        .as_f64()
+        .filter(|f| f.is_sign_positive() && f.fract() == 0.0)
+    {
+        return Ok(val as u64);
+    }
+
+    Err(de::Error::custom(
+        "number must be integer or float representing a whole number in valid u64 range",
+    ))
+}
+
+impl std::fmt::Display for Id {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Id::Null => f.write_str("null"),
+            Id::Num(num) => write!(f, "{}", num),
+            Id::Str(string) => f.write_str(string),
+        }
+    }
 }
 
 /// Protocol Version
@@ -127,7 +164,7 @@ impl Serialize for Version {
 
 struct VersionVisitor;
 
-impl<'v> Visitor<'v> for VersionVisitor {
+impl Visitor<'_> for VersionVisitor {
     type Value = Version;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -170,6 +207,10 @@ impl Params {
         serde_json::from_value(value)
             .map_err(|err| Error::invalid_params(format!("Invalid params: {}.", err)))
     }
+
+    pub fn is_none(&self) -> bool {
+        self == &Params::None
+    }
 }
 
 impl From<Params> for Value {
@@ -187,7 +228,7 @@ impl From<Params> for Value {
 pub struct MethodCall {
     pub jsonrpc: Option<Version>,
     pub method: String,
-    #[serde(default = "default_params")]
+    #[serde(default = "default_params", skip_serializing_if = "Params::is_none")]
     pub params: Params,
     pub id: Id,
 }
@@ -197,7 +238,7 @@ pub struct MethodCall {
 pub struct Notification {
     pub jsonrpc: Option<Version>,
     pub method: String,
-    #[serde(default = "default_params")]
+    #[serde(default = "default_params", skip_serializing_if = "Params::is_none")]
     pub params: Params,
 }
 
@@ -332,6 +373,49 @@ fn notification_serialize() {
         serialized,
         r#"{"jsonrpc":"2.0","method":"update","params":[1,2]}"#
     );
+}
+
+#[test]
+fn serialize_skip_none_params() {
+    use serde_json;
+
+    let m = MethodCall {
+        jsonrpc: Some(Version::V2),
+        method: "shutdown".to_owned(),
+        params: Params::None,
+        id: Id::Num(1),
+    };
+
+    let serialized = serde_json::to_string(&m).unwrap();
+    assert_eq!(
+        serialized,
+        r#"{"jsonrpc":"2.0","method":"shutdown","id":1}"#
+    );
+
+    let n = Notification {
+        jsonrpc: Some(Version::V2),
+        method: "exit".to_owned(),
+        params: Params::None,
+    };
+
+    let serialized = serde_json::to_string(&n).unwrap();
+    assert_eq!(serialized, r#"{"jsonrpc":"2.0","method":"exit"}"#);
+}
+
+#[test]
+fn id_deserialize() {
+    use serde_json;
+
+    let id = r#"8"#;
+    let deserialized: Id = serde_json::from_str(id).unwrap();
+    assert_eq!(deserialized, Id::Num(8));
+
+    let id = r#"4.0"#;
+    let deserialized: Id = serde_json::from_str(id).unwrap();
+    assert_eq!(deserialized, Id::Num(4));
+
+    let id = r#"0.01"#;
+    assert!(serde_json::from_str::<Id>(id).is_err());
 }
 
 #[test]
