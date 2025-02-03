@@ -1,3 +1,5 @@
+(identifier) @variable
+
 ; Methods
 
 (method_declaration
@@ -12,8 +14,6 @@
   name: (identifier) @attribute)
 (marker_annotation
   name: (identifier) @attribute)
-
-"@" @operator
 
 ; Types
 
@@ -48,12 +48,13 @@
   (void_type)
 ] @type.builtin
 
+(type_arguments
+  (wildcard "?" @type.builtin))
+
 ; Variables
 
 ((identifier) @constant
  (#match? @constant "^_*[A-Z][A-Z\\d_]+$"))
-
-(identifier) @variable
 
 (this) @variable.builtin
 
@@ -86,6 +87,84 @@
 
 (line_comment) @comment
 (block_comment) @comment
+
+; Punctuation
+
+[
+  "::"
+  "."
+  ";"
+  ","
+] @punctuation.delimiter
+
+[
+  "@"
+  "..."
+] @punctuation.special
+
+[
+  "("
+  ")"
+  "["
+  "]"
+  "{"
+  "}"
+] @punctuation.bracket
+
+(type_arguments
+  [
+    "<"
+    ">"
+  ] @punctuation.bracket)
+
+(type_parameters
+  [
+    "<"
+    ">"
+  ] @punctuation.bracket)
+
+; Operators
+
+[
+  "="
+  ">"
+  "<"
+  "!"
+  "~"
+  "?"
+  ":"
+  "->"
+  "=="
+  ">="
+  "<="
+  "!="
+  "&&"
+  "||"
+  "++"
+  "--"
+  "+"
+  "-"
+  "*"
+  "/"
+  "&"
+  "|"
+  "^"
+  "%"
+  "<<"
+  ">>"
+  ">>>"
+  "+="
+  "-="
+  "*="
+  "/="
+  "&="
+  "|="
+  "^="
+  "%="
+  "<<="
+  ">>="
+  ">>>="
+] @operator
 
 ; Keywords
 

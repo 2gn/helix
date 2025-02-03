@@ -1,9 +1,51 @@
+; Comments
+(tripledot) @comment.discard
+
+[(comment) (line_comment) (shebang)] @comment
+
+; Basic types
+(variable) @variable
+((atom) @constant.builtin.boolean
+ (#match? @constant.builtin.boolean "^(true|false)$"))
+(atom) @string.special.symbol
+[(string) (sigil)] @string
+(character) @constant.character
+(escape_sequence) @constant.character.escape
+
+(integer) @constant.numeric.integer
+(float) @constant.numeric.float
+
+; Punctuation
+["," "." "-" ";"] @punctuation.delimiter
+["(" ")" "#" "{" "}" "[" "]" "<<" ">>"] @punctuation.bracket
+
+; Operators
+(binary_operator
+  left: (atom) @function
+  operator: "/"
+  right: (integer) @constant.numeric.integer)
+
+((binary_operator operator: _ @keyword.operator)
+ (#match? @keyword.operator "^\\w+$"))
+((unary_operator operator: _ @keyword.operator)
+ (#match? @keyword.operator "^\\w+$"))
+
+(binary_operator operator: _ @operator)
+(unary_operator operator: _ @operator)
+["/" ":" "->"] @operator
+
+
+; Keywords
+(attribute name: (atom) @keyword)
+
+["case" "fun" "if" "of" "when" "end" "receive" "try" "catch" "after" "begin" "maybe"] @keyword
+
 ; Attributes
 ; module declaration
 (attribute
   name: (atom) @keyword
   (arguments (atom) @namespace)
- (#match? @keyword "(module|behaviou?r)"))
+ (#any-of? @keyword "module" "behaviour" "behavior"))
 
 (attribute
   name: (atom) @keyword
@@ -50,12 +92,20 @@
   name: (atom) @keyword
   (arguments
     (_) @keyword.directive)
- (#match? @keyword "ifn?def"))
+ (#any-of? @keyword "ifndef" "ifdef"))
 
 (attribute
   name: (atom) @keyword
   module: (atom) @namespace
- (#match? @keyword "(spec|callback)"))
+ (#any-of? @keyword "spec" "callback"))
+
+(attribute
+  name: (atom) @keyword
+  (arguments [
+    (string)
+    (sigil)
+  ] @comment.block.documentation)
+ (#any-of? @keyword "doc" "moduledoc"))
 
 ; Functions
 (function_clause name: (atom) @function)
@@ -64,6 +114,16 @@
 (stab_clause name: (atom) @function)
 (function_capture module: (atom) @namespace)
 (function_capture function: (atom) @function)
+
+; Macros
+(macro
+  "?"+ @constant
+  name: (_) @constant
+  !arguments)
+
+(macro
+  "?"+ @keyword.directive
+  name: (_) @keyword.directive)
 
 ; Ignored variables
 ((variable) @comment.discard
@@ -74,7 +134,7 @@
 ((attribute
    name: (atom) @keyword
    (stab_clause
-     pattern: (arguments (variable) @variable.parameter)
+     pattern: (arguments (variable)? @variable.parameter)
      body: (variable)? @variable.parameter))
  (#match? @keyword "(spec|callback)"))
 ; functions
@@ -104,55 +164,3 @@
 
 (record field: (atom) @variable.other.member)
 (record name: (atom) @type)
-
-; Keywords
-(attribute name: (atom) @keyword)
-
-["case" "fun" "if" "of" "when" "end" "receive" "try" "catch" "after" "begin" "maybe"] @keyword
-
-; Operators
-(binary_operator
-  left: (atom) @function
-  operator: "/"
-  right: (integer) @constant.numeric.integer)
-
-((binary_operator operator: _ @keyword.operator)
- (#match? @keyword.operator "^\\w+$"))
-((unary_operator operator: _ @keyword.operator)
- (#match? @keyword.operator "^\\w+$"))
-
-(binary_operator operator: _ @operator)
-(unary_operator operator: _ @operator)
-["/" ":" "->"] @operator
-
-; Macros
-(macro
-  "?"+ @constant
-  name: (_) @constant
-  !arguments)
-
-(macro
-  "?"+ @keyword.directive
-  name: (_) @keyword.directive)
-
-; Comments
-(tripledot) @comment.discard
-
-[(comment) (line_comment) (shebang)] @comment
-
-; Basic types
-(variable) @variable
-((atom) @constant.builtin.boolean
- (#match? @constant.builtin.boolean "^(true|false)$"))
-(atom) @string.special.symbol
-(string) @string
-(character) @constant.character
-
-(integer) @constant.numeric.integer
-(float) @constant.numeric.float
-
-; Punctuation
-["," "." "-" ";"] @punctuation.delimiter
-["(" ")" "#" "{" "}" "[" "]" "<<" ">>"] @punctuation.bracket
-
-; (ERROR) @error
